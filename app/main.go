@@ -17,17 +17,15 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	db.AutoMigrate(&models.Play{}, &models.Presentation{})
+	db.AutoMigrate(&models.Play{}, &models.Presentation{}, &models.User{})
 
 	handlers.SetDB(db)
 
 	app := fiber.New()
 
 	routers.SetupRoutes(app)
-
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.SendString("Hello, Fiber!")
-	})
+	routers.SetupAdminRoutes(app)
+	routers.SetupAuthRoutes(app)
 
 	app.Listen(":8000")
 }
