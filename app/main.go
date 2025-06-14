@@ -23,9 +23,9 @@ func main() {
 
 	app := fiber.New()
 
-	routers.SetupRoutes(app)
-	routers.SetupAdminRoutes(app)
+	routers.SetupPublicRoutes(app)
+	routers.SetupStripeRoutes(app)
 	routers.SetupAuthRoutes(app)
-
+	routers.SetupAdminRoutes(app)
 	app.Listen(":8000")
 }

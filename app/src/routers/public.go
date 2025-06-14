@@ -5,7 +5,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func SetupRoutes(app *fiber.App) {
+func SetupPublicRoutes(app *fiber.App) {
 	// Play routes (public)
 	app.Get("/plays", handlers.ListPlays) // sorted alphabetically
 	app.Get("/plays/:id", handlers.GetPlay)

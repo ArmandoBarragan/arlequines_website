@@ -4,7 +4,7 @@ services:
   db:
     image: postgres:15
     restart: always
-    env_file: example.env
+    env_file: .env
     ports:
       - "5432:5432"
     volumes:
@@ -15,10 +15,12 @@ services:
       context: ./app
     ports:
       - "8000:8000"
-    env_file: example.env
+    env_file: .env
     depends_on:
       - db
     restart: always
+    volumes:
+      - ./app:/app
     command: ["go", "run", "main.go"]
 
 volumes:

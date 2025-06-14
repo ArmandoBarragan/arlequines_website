@@ -12,6 +12,12 @@ import (
 var jwtSecret = []byte("your-secret-key") // In production, use environment variable
 
 func CreateAccount(c *fiber.Ctx) error {
+	/*
+		Creates a new user
+		Receives the user
+		Creates the user
+		Returns the created user
+	*/
 	var req structs.RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -55,6 +61,12 @@ func CreateAccount(c *fiber.Ctx) error {
 }
 
 func Login(c *fiber.Ctx) error {
+	/*
+		Logs in a user
+		Receives the user
+		Logs in the user
+		Returns the logged in user
+	*/
 	var req structs.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -92,6 +104,12 @@ func Login(c *fiber.Ctx) error {
 }
 
 func generateToken(user models.User) (string, error) {
+	/*
+		Generates a JWT token for a user
+		Receives the user
+		Generates a JWT token for the user
+		Returns the JWT token
+	*/
 	// Create the Claims
 	claims := jwt.MapClaims{
 		"id":       user.ID,
@@ -110,6 +128,12 @@ func generateToken(user models.User) (string, error) {
 // Middleware to protect routes
 func Protected() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		/*
+			Protects a route
+			Receives the request
+			Protects the route
+			Returns the protected route
+		*/
 		token := c.Get("Authorization")
 		if token == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -143,6 +167,12 @@ func Protected() fiber.Handler {
 // Middleware to check if user is admin
 func AdminOnly() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		/*
+			Checks if the user is an admin
+			Receives the request
+			Checks if the user is an admin
+			Returns the admin only route
+		*/
 		user := c.Locals("user").(jwt.MapClaims)
 		if !user["is_admin"].(bool) {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{

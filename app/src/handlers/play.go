@@ -14,6 +14,9 @@ func SetDB(database *gorm.DB) {
 }
 
 func ListPlays(c *fiber.Ctx) error {
+	/*
+		Lists all plays
+	*/
 	var plays []models.Play
 	if err := db.Order("name asc").Find(&plays).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -22,6 +25,9 @@ func ListPlays(c *fiber.Ctx) error {
 }
 
 func GetPlay(c *fiber.Ctx) error {
+	/*
+		Gets a play by id
+	*/
 	id := c.Params("id")
 	var play models.Play
 	if err := db.First(&play, id).Error; err != nil {
@@ -31,6 +37,11 @@ func GetPlay(c *fiber.Ctx) error {
 }
 
 func CreatePlay(c *fiber.Ctx) error {
+	/*
+		Creates a new play
+		Receives the play
+		Creates the play
+	*/
 	var play structs.Play
 	if err := c.BodyParser(&play); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
@@ -43,6 +54,11 @@ func CreatePlay(c *fiber.Ctx) error {
 }
 
 func UpdatePlay(c *fiber.Ctx) error {
+	/*
+		Updates a play
+		Receives the id of the play and the play
+		Updates the play
+	*/
 	id := c.Params("id")
 	var play models.Play
 	if err := db.First(&play, id).Error; err != nil {
@@ -61,6 +77,10 @@ func UpdatePlay(c *fiber.Ctx) error {
 }
 
 func DeletePlay(c *fiber.Ctx) error {
+	/*
+		Deletes a play
+		Receives the id of the play
+	*/
 	id := c.Params("id")
 	if err := db.Delete(&models.Play{}, id).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})

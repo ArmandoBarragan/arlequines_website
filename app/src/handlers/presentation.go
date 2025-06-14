@@ -9,6 +9,10 @@ import (
 // db is declared in play.go and should be set via SetDB
 
 func ListPresentations(c *fiber.Ctx) error {
+	/*
+		Lists all presentations
+		Returns the presentations
+	*/
 	var presentations []models.Presentation
 	if err := db.Order("date_time asc").Find(&presentations).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -17,6 +21,10 @@ func ListPresentations(c *fiber.Ctx) error {
 }
 
 func GetPresentation(c *fiber.Ctx) error {
+	/*
+		Gets a presentation by id
+		Returns the presentation
+	*/
 	id := c.Params("id")
 	var presentation models.Presentation
 	if err := db.First(&presentation, id).Error; err != nil {
@@ -26,6 +34,12 @@ func GetPresentation(c *fiber.Ctx) error {
 }
 
 func CreatePresentations(c *fiber.Ctx) error {
+	/*
+		Creates a new presentation
+		Receives a list of presentations
+		Creates the presentations
+		Returns the created presentations
+	*/
 	var input structs.PresentationsList
 	if err := c.BodyParser(&input); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
@@ -49,6 +63,12 @@ func CreatePresentations(c *fiber.Ctx) error {
 }
 
 func UpdatePresentation(c *fiber.Ctx) error {
+	/*
+		Updates a presentation
+		Receives the id of the presentation and the presentation
+		Updates the presentation
+		Returns the updated presentation
+	*/
 	id := c.Params("id")
 	var presentation models.Presentation
 	if err := db.First(&presentation, id).Error; err != nil {
@@ -71,6 +91,12 @@ func UpdatePresentation(c *fiber.Ctx) error {
 }
 
 func DeletePresentation(c *fiber.Ctx) error {
+	/*
+		Deletes a presentation
+		Receives the id of the presentation
+		Deletes the presentation
+		Returns the deleted presentation
+	*/
 	id := c.Params("id")
 	if err := db.Delete(&models.Presentation{}, id).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
