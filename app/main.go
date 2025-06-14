@@ -26,6 +26,6 @@ func main() {
 	routers.SetupRoutes(app)
 	routers.SetupAdminRoutes(app)
 	routers.SetupAuthRoutes(app)
-
+	routers.SetupStripeRoutes(app)
 	app.Listen(":8000")
 }
