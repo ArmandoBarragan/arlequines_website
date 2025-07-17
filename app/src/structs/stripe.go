@@ -1,6 +1,8 @@
 package structs
 
 import (
+	"strconv"
+
 	"github.com/ArmandoBarragan/arlequines_website/settings"
 	"github.com/ArmandoBarragan/arlequines_website/src/models"
 	"github.com/stripe/stripe-go/v82"
@@ -15,6 +17,7 @@ type StripeWebhook struct {
 
 func (s *StripeWebhook) CreateCheckoutSession(presentation models.Presentation) (*stripe.CheckoutSession, error) {
 	config := settings.LoadConfig()
+	successURL := "/stripe/success?session_id={CHECKOUT_SESSION_ID}&presentation_id="
 	params := &stripe.CheckoutSessionParams{
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
@@ -28,9 +31,11 @@ func (s *StripeWebhook) CreateCheckoutSession(presentation models.Presentation) 
 				Quantity: stripe.Int64(int64(s.AmountOfTickets)), // Quantity of the item
 			},
 		},
-		Mode:          stripe.String(string(stripe.CheckoutSessionModePayment)), // Set mode to 'payment' for one-time payments
-		SuccessURL:    stripe.String(config.HostURL + "/stripe/success"),        // URL to redirect after successful payment
-		CancelURL:     stripe.String(config.HostURL + "/stripe/cancel"),         // URL to redirect if payment is cancelled
+		Mode: stripe.String(string(stripe.CheckoutSessionModePayment)), // Set mode to 'payment' for one-time payments
+		SuccessURL: stripe.String(
+			config.HostURL + successURL + strconv.Itoa(int(presentation.ID)),
+		), // URL to redirect after successful payment
+		CancelURL:     stripe.String(config.HostURL + "/stripe/cancel"), // URL to redirect if payment is cancelled
 		CustomerEmail: stripe.String(s.Email),
 	}
 	return session.New(params)

@@ -23,5 +23,16 @@ services:
       - ./app:/app
     command: ["go", "run", "main.go"]
 
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - local_redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+
 volumes:
   local_postgres_data: {}
+  local_redis_data: {}

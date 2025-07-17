@@ -7,6 +7,7 @@ import (
 	"github.com/ArmandoBarragan/arlequines_website/src/handlers"
 	"github.com/ArmandoBarragan/arlequines_website/src/models"
 	"github.com/ArmandoBarragan/arlequines_website/src/routers"
+	"github.com/ArmandoBarragan/arlequines_website/src/structs"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -21,6 +22,15 @@ func main() {
 
 	handlers.SetDB(db)
 
+	redis := settings.InitRedis(config)
+	settings.InitConsumerGroup(redis, config)
+	structs.RedisClient = redis
+	structs.Config = config
+
+	for i := 0; i < 2; i++ {
+		go structs.EmailEventConsumerWorker(redis, i, config)
+	}
+	// TODO: Create a thread that deletes successful redis tasks every day at 12:00 AM
 	app := fiber.New()
 
 	routers.SetupPublicRoutes(app)

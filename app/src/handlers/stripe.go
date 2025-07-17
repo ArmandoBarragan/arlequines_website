@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"strconv"
+
 	"github.com/ArmandoBarragan/arlequines_website/src/models"
 	"github.com/ArmandoBarragan/arlequines_website/src/structs"
 	"github.com/gofiber/fiber/v2"
+	"github.com/stripe/stripe-go/v82/checkout/session"
 )
 
 func StripeWebhook(c *fiber.Ctx) error {
@@ -33,6 +36,30 @@ func StripeWebhook(c *fiber.Ctx) error {
 }
 
 func Success(c *fiber.Ctx) error {
+	sessionID := c.Query("session_id")
+	if sessionID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Session ID was invalid"})
+	}
+	presentationID, err := strconv.Atoi(c.Query("presentation_id"))
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Error getting presentation"})
+	}
+	presentation := models.Presentation{ID: uint(presentationID)}
+	if err := db.First(&presentation).Error; err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Presentation not found"})
+	}
+	sessionData, err := session.Get(sessionID, nil)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Error getting session"})
+	}
+	quantity := int64(float64(sessionData.AmountTotal) / presentation.Price)
+	paymentEvent := structs.PaymentEvent{
+		Email:          sessionData.CustomerEmail,
+		Amount:         sessionData.AmountTotal,
+		Quantity:       quantity,
+		PresentationID: presentationID,
+	}
+	paymentEvent.CreateEmailSendingEvent()
 	return c.SendStatus(200)
 }
 

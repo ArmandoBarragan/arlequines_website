@@ -148,7 +148,7 @@ func Protected() fiber.Handler {
 
 		// Parse token
 		claims := jwt.MapClaims{}
-		parsedToken, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
+		parsedToken, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (any, error) {
 			return jwtSecret, nil
 		})
 
