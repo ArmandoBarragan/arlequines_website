@@ -1,10 +1,10 @@
-package structs
+package services
 
-type SendEmailEvent struct {
+type EmailService struct {
 	Email   string `json:"email"`
 	Subject string `json:"subject"`
 	Body    string `json:"body"`
 }
 
-func (s *SendEmailEvent) SendEmail() {
+func (s *EmailService) SendEmail() {
 }

@@ -8,18 +8,17 @@ import (
 )
 
 type User struct {
-	ID        uint           `gorm:"primarykey" json:"id"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
-	Email     string         `gorm:"uniqueIndex;not null" json:"email"`
-	Password  string         `gorm:"not null" json:"-"`
-	Name      string         `gorm:"not null" json:"name"`
-	IsAdmin   bool           `gorm:"default:false" json:"is_admin"`
+	ID        uint      `gorm:"primarykey"`
+	CreatedAt time.Time `gorm:"created_at"`
+	UpdatedAt time.Time `gorm:"updated_at"`
+	Email     string    `gorm:"uniqueIndex;not null"`
+	Password  string    `gorm:"not null"`
+	Name      string    `gorm:"not null"`
+	IsAdmin   bool      `gorm:"default:false"`
 }
 
 // BeforeSave is a GORM hook that hashes the password before saving
-func (u *User) BeforeSave(tx *gorm.DB) error {
+func (u *User) BeforeSave(db *gorm.DB) error {
 	if u.Password != "" {
 		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 		if err != nil {
@@ -28,10 +27,4 @@ func (u *User) BeforeSave(tx *gorm.DB) error {
 		u.Password = string(hashedPassword)
 	}
 	return nil
-}
-
-// CheckPassword compares the provided password with the stored hash
-func (u *User) CheckPassword(password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(password))
-	return err == nil
 }

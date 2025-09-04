@@ -12,6 +12,7 @@ import (
 )
 
 type Config struct {
+	SecretKey                   string
 	DBHost                      string
 	DBPort                      string
 	DBUser                      string
@@ -65,6 +66,7 @@ func LoadConfig() *Config {
 		timer = 60
 	}
 	config := &Config{
+		SecretKey:        os.Getenv("SECRET_KEY"),
 		DBHost:           os.Getenv("DB_HOST"),
 		DBPort:           os.Getenv("DB_PORT"),
 		DBUser:           os.Getenv("DB_USER"),
