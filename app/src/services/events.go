@@ -1,4 +1,4 @@
-package structs
+package services
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/ArmandoBarragan/arlequines_website/settings"
 	"github.com/redis/go-redis/v9"
 )
-
+// Deprecated: Will use AWS SQS instead
 func EmailEventConsumerWorker(redisClient *redis.Client, workerID int, config *settings.Config) {
 	ctx := context.Background()
 	myConsumerName := fmt.Sprintf("%s%d", config.RedisConsumerConfigurations["payment_consumer_prefix"], workerID)

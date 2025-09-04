@@ -2,14 +2,31 @@ package routers
 
 import (
 	"github.com/ArmandoBarragan/arlequines_website/src/handlers"
+	"github.com/ArmandoBarragan/arlequines_website/src/repositories"
+	"github.com/ArmandoBarragan/arlequines_website/src/services"
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
-func SetupAdminRoutes(app *fiber.App) {
-	// Admin routes
+func SetupAdminRoutes(app *fiber.App, db *gorm.DB, secretKey string) {
+	// Initialize repositories
+	userRepository := repositories.NewUserRepository(db, secretKey)
+	playRepository := repositories.NewPlayRepository(db)
+	presentationRepository := repositories.NewPresentationRepository(db)
+
+	// Initialize services
+	authService := services.NewAuthService(userRepository, secretKey)
+	playService := services.NewPlayService(playRepository)
+	presentationService := services.NewPresentationService(presentationRepository)
+
+	// Initialize handlers
+	authHandler := handlers.NewAuthHandler(authService)
+	playHandler := handlers.CreatePlayHandler(playService)
+	presentationHandler := handlers.CreatePresentationHandler(presentationService)
+
 	admin := app.Group("/admin")
-	admin.Use(handlers.Protected())
-	admin.Use(handlers.AdminOnly())
+	admin.Use(authHandler.Protected())
+	admin.Use(authHandler.AdminOnly())
 
 	// Admin dashboard
 	admin.Get("/dashboard", func(c *fiber.Ctx) error {
@@ -20,13 +37,13 @@ func SetupAdminRoutes(app *fiber.App) {
 
 	// Play management routes
 	plays := admin.Group("/plays")
-	plays.Post("/", handlers.CreatePlay)
-	plays.Put("/:id", handlers.UpdatePlay)
-	plays.Delete("/:id", handlers.DeletePlay)
+	plays.Post("/", playHandler.Create)
+	plays.Put("/:id", playHandler.Update)
+	plays.Delete("/:id", playHandler.Delete)
 
 	// Presentation management routes
 	presentations := admin.Group("/presentations")
-	presentations.Post("/", handlers.CreatePresentations)
-	presentations.Put("/:id", handlers.UpdatePresentation)
-	presentations.Delete("/:id", handlers.DeletePresentation)
+	presentations.Post("/", presentationHandler.Create)
+	presentations.Put("/:id", presentationHandler.Update)
+	presentations.Delete("/:id", presentationHandler.Delete)
 }
