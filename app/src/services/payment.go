@@ -1,4 +1,4 @@
-package structs
+package services
 
 import (
 	"context"
@@ -14,7 +14,7 @@ type PaymentEvent struct {
 	Email          string `redis:"email"`
 	Amount         int64  `redis:"amount"`
 	Quantity       int64  `redis:"quantity"`
-	PresentationID int    `redis:"presentation_id"`
+	PresentationID uint   `redis:"presentation_id"`
 }
 
 func (p *PaymentEvent) CreateEmailSendingEvent() {

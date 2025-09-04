@@ -1,139 +1,63 @@
 package handlers
 
 import (
-	"time"
-
-	"github.com/ArmandoBarragan/arlequines_website/src/models"
-	"github.com/ArmandoBarragan/arlequines_website/src/structs"
+	"github.com/ArmandoBarragan/arlequines_website/src/services"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
-var jwtSecret = []byte("your-secret-key") // In production, use environment variable
+type AuthHandler interface {
+	CreateAccount(c *fiber.Ctx) error
+	Login(c *fiber.Ctx) error
+	Protected(c *fiber.Ctx) fiber.Handler
+	AdminOnly(c *fiber.Ctx) fiber.Handler
+}
 
-func CreateAccount(c *fiber.Ctx) error {
-	/*
-		Creates a new user
-		Receives the user
-		Creates the user
-		Returns the created user
-	*/
-	var req structs.RegisterRequest
+type authHandler struct {
+	service services.AuthService
+}
+
+func NewAuthHandler(service services.AuthService) authHandler {
+	return authHandler{service: service}
+}
+
+func (handler *authHandler) CreateAccount(c *fiber.Ctx) error {
+	var req services.CreateAccountRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
-
-	// Check if user already exists
-	var existingUser models.User
-	if err := db.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-			"error": "User already exists",
-		})
-	}
-
-	// Create new user
-	user := models.User{
-		Email:    req.Email,
-		Password: req.Password, // Will be hashed by BeforeSave hook
-		Name:     req.Name,
-	}
-
-	if err := db.Create(&user).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to create user",
-		})
-	}
-
-	// Generate JWT token
-	token, err := generateToken(user)
+	response, err := handler.service.CreateAccount(req)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate token",
-		})
+		return c.Status(fiber.StatusInternalServerError).JSON(err.Error())
 	}
-
-	return c.JSON(structs.AuthResponse{
-		Token: token,
-		User:  user,
-	})
+	return c.Status(fiber.StatusOK).JSON(response)
 }
 
-func Login(c *fiber.Ctx) error {
-	/*
-		Logs in a user
-		Receives the user
-		Logs in the user
-		Returns the logged in user
-	*/
-	var req structs.LoginRequest
+func (handler *authHandler) Login(c *fiber.Ctx) error {
+	var req services.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Invalid request body",
 		})
 	}
-
-	// Find user by email
-	var user models.User
-	if err := db.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid credentials",
+	response, err := handler.service.Login(req)
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return c.Status(fiber.StatusInternalServerError).JSON(err.Error())
+	}
+	if err == gorm.ErrRecordNotFound {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "User not found",
 		})
 	}
-
-	// Check password
-	if !user.CheckPassword(req.Password) {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"error": "Invalid credentials",
-		})
-	}
-
-	// Generate JWT token
-	token, err := generateToken(user)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to generate token",
-		})
-	}
-
-	return c.JSON(structs.AuthResponse{
-		Token: token,
-		User:  user,
-	})
-}
-
-func generateToken(user models.User) (string, error) {
-	/*
-		Generates a JWT token for a user
-		Receives the user
-		Generates a JWT token for the user
-		Returns the JWT token
-	*/
-	// Create the Claims
-	claims := jwt.MapClaims{
-		"id":       user.ID,
-		"email":    user.Email,
-		"is_admin": user.IsAdmin,
-		"exp":      time.Now().Add(24 * time.Hour).Unix(),
-	}
-
-	// Create token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// Generate encoded token
-	return token.SignedString(jwtSecret)
+	return c.Status(fiber.StatusOK).JSON(response)
 }
 
 // Middleware to protect routes
-func Protected() fiber.Handler {
+func (handler *authHandler) Protected() fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		/*
-			Protects a route
-			Receives the request
-			Protects the route
-			Returns the protected route
-		*/
 		token := c.Get("Authorization")
 		if token == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -141,31 +65,21 @@ func Protected() fiber.Handler {
 			})
 		}
 
-		// Remove "Bearer " prefix if present
 		if len(token) > 7 && token[:7] == "Bearer " {
 			token = token[7:]
 		}
 
-		// Parse token
-		claims := jwt.MapClaims{}
-		parsedToken, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (any, error) {
-			return jwtSecret, nil
-		})
-
-		if err != nil || !parsedToken.Valid {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "Invalid token",
-			})
+		claims, err := handler.service.ParseAndValidateToken(token)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": err.Error()})
 		}
-
-		// Add user info to context
 		c.Locals("user", claims)
 		return c.Next()
 	}
 }
 
 // Middleware to check if user is admin
-func AdminOnly() fiber.Handler {
+func (handler *authHandler) AdminOnly() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		/*
 			Checks if the user is an admin

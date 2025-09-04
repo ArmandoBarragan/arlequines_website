@@ -1,105 +1,152 @@
 package handlers
 
 import (
+	"errors"
+	"strconv"
+	"time"
+
 	"github.com/ArmandoBarragan/arlequines_website/src/models"
-	"github.com/ArmandoBarragan/arlequines_website/src/structs"
+	"github.com/ArmandoBarragan/arlequines_website/src/repositories"
+	"github.com/ArmandoBarragan/arlequines_website/src/services"
 	"github.com/gofiber/fiber/v2"
+	"gorm.io/gorm"
 )
 
-// db is declared in play.go and should be set via SetDB
-
-func ListPresentations(c *fiber.Ctx) error {
-	/*
-		Lists all presentations
-		Returns the presentations
-	*/
-	var presentations []models.Presentation
-	if err := db.Order("date_time asc").Find(&presentations).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-	}
-	return c.JSON(presentations)
+type PresentationHandler interface {
+	Create(c *fiber.Ctx) error
+	GetDetail(c *fiber.Ctx) error
+	GetList(c *fiber.Ctx) error
+	Update(c *fiber.Ctx) error
+	Delete(c *fiber.Ctx) error
 }
 
-func GetPresentation(c *fiber.Ctx) error {
-	/*
-		Gets a presentation by id
-		Returns the presentation
-	*/
-	id := c.Params("id")
-	var presentation models.Presentation
-	if err := db.First(&presentation, id).Error; err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Presentation not found"})
-	}
-	return c.JSON(presentation)
+type presentationHandler struct {
+	service services.PresentationService
 }
 
-func CreatePresentations(c *fiber.Ctx) error {
-	/*
-		Creates a new presentation
-		Receives a list of presentations
-		Creates the presentations
-		Returns the created presentations
-	*/
-	var input structs.PresentationsList
-	if err := c.BodyParser(&input); err != nil {
+func CreatePresentationHandler(service services.PresentationService) presentationHandler {
+	return presentationHandler{service: service}
+}
+
+func (handler *presentationHandler) Create(c *fiber.Ctx) error {
+	var presentation services.CreatePresentationsRequest
+	if err := c.BodyParser(&presentation); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
-	var created []models.Presentation
-	for _, p := range input.Presentations {
-		model := models.Presentation{
-			PlayID:         p.PlayID,
-			DateTime:       p.DateTime,
-			Location:       p.Location,
-			Price:          p.Price,
-			SeatLimit:      p.SeatLimit,
-			AvailableSeats: p.AvailableSeats,
-		}
-		if err := db.Create(&model).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-		}
-		created = append(created, model)
+	presentationFromDB, err := handler.service.CreatePresentation(presentation)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
-	return c.Status(201).JSON(created)
+	return c.Status(201).JSON(presentationFromDB)
 }
 
-func UpdatePresentation(c *fiber.Ctx) error {
-	/*
-		Updates a presentation
-		Receives the id of the presentation and the presentation
-		Updates the presentation
-		Returns the updated presentation
-	*/
-	id := c.Params("id")
-	var presentation models.Presentation
-	if err := db.First(&presentation, id).Error; err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Presentation not found"})
+func (handler *presentationHandler) parsePresentation(presentation *models.Presentation) services.PresentationResponse {
+	return services.PresentationResponse{
+		ID:             presentation.ID,
+		PlayID:         presentation.PlayID,
+		DateTime:       presentation.DateTime,
+		Location:       presentation.Location,
+		Price:          presentation.Price,
+		SeatLimit:      presentation.SeatLimit,
+		AvailableSeats: presentation.AvailableSeats,
 	}
-	var input structs.Presentation
-	if err := c.BodyParser(&input); err != nil {
+}
+
+func (handler *presentationHandler) GetList(c *fiber.Ctx) error {
+	filter := repositories.PresentationFilter{
+		Limit:  10, // Default limit
+		Offset: 0,  // Default offset
+	}
+
+	// Parse limit and offset
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if limit, err := strconv.Atoi(limitStr); err == nil && limit > 0 {
+			filter.Limit = limit
+		}
+	}
+	if offsetStr := c.Query("offset"); offsetStr != "" {
+		if offset, err := strconv.Atoi(offsetStr); err == nil && offset >= 0 {
+			filter.Offset = offset
+		}
+	}
+
+	// Parse date filter
+	if dateStr := c.Query("date"); dateStr != "" {
+		if date, err := time.Parse("2006-01-02", dateStr); err == nil {
+			filter.Date = date
+		}
+	}
+
+	// Parse location filter
+	if location := c.Query("location"); location != "" {
+		filter.Location = location
+	}
+
+	// Parse price filter
+	if priceStr := c.Query("price"); priceStr != "" {
+		if price, err := strconv.ParseFloat(priceStr, 64); err == nil && price > 0 {
+			filter.Price = price
+		}
+	}
+
+	presentations, err := handler.service.ListPresentations(filter)
+	var presentationResponse []services.PresentationResponse
+	for _, presentation := range presentations {
+		presentationResponse = append(presentationResponse, handler.parsePresentation(&presentation))
+	}
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(200).JSON(presentationResponse)
+}
+
+func (handler *presentationHandler) GetDetail(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
 	}
-	presentation.PlayID = input.PlayID
-	presentation.DateTime = input.DateTime
-	presentation.Location = input.Location
-	presentation.Price = input.Price
-	presentation.SeatLimit = input.SeatLimit
-	presentation.AvailableSeats = input.AvailableSeats
-	if err := db.Save(&presentation).Error; err != nil {
+	presentation, err := handler.service.GetPresentation(uint(id))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(404).JSON(fiber.Map{"error": "Presentation not found"})
+		}
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
-	return c.JSON(presentation)
+	return c.Status(200).JSON(handler.parsePresentation(presentation))
+
 }
 
-func DeletePresentation(c *fiber.Ctx) error {
-	/*
-		Deletes a presentation
-		Receives the id of the presentation
-		Deletes the presentation
-		Returns the deleted presentation
-	*/
-	id := c.Params("id")
-	if err := db.Delete(&models.Presentation{}, id).Error; err != nil {
+func (handler *presentationHandler) Update(c *fiber.Ctx) error {
+	var presentation services.UpdatePresentationRequest
+	if err := c.BodyParser(&presentation); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	presentationID, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	presentation.ID = uint(presentationID)
+	updatedPresentation, err := handler.service.UpdatePresentation(presentation)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(404).JSON(fiber.Map{"error": "Presentation not found"})
+		}
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
-	return c.SendStatus(204)
+	return c.JSON(handler.parsePresentation(&updatedPresentation))
+}
+
+func (handler *presentationHandler) Delete(c *fiber.Ctx) error {
+	id, err := strconv.Atoi(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	err = handler.service.DeletePresentation(uint(id))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(404).JSON(fiber.Map{"error": "Presentation not found"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(204).JSON(fiber.Map{"message": "presentation deleted successfuly"})
 }
