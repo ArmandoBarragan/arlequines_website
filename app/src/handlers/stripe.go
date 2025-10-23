@@ -50,9 +50,7 @@ func (handler *stripeHandler) Success(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Error getting presentation"})
 	}
-
-	err = handler.service.ProcessPaymentSuccess(uint(presentationID), sessionID)
-	if err != nil {
+	if err := handler.service.ProcessPaymentSuccessSQS(uint(presentationID), sessionID); err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.SendStatus(200)

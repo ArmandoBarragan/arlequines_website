@@ -29,6 +29,10 @@ type Config struct {
 	SMTPUser                    string
 	SMTPPass                    string
 	ConsumerTimer               time.Duration
+	AWSRegion          string
+	SQSQueueURL        string
+	AWSAccessKeyID     string
+	AWSSecretAccessKey string
 }
 
 func InitRedis(config *Config) *redis.Client {
@@ -46,7 +50,7 @@ func InitRedis(config *Config) *redis.Client {
 	return client
 }
 
-func InitConsumerGroup(redisClient *redis.Client, config *Config) {
+func InitRedisConsumerGroup(redisClient *redis.Client, config *Config) {
 	ctx := context.Background()
 	err := redisClient.XGroupCreateMkStream(
 		ctx,
@@ -88,6 +92,11 @@ func LoadConfig() *Config {
 		SMTPUser:      os.Getenv("SMTP_USER"),
 		SMTPPass:      os.Getenv("SMTP_PASS"),
 		ConsumerTimer: time.Duration(timer),
+		AWSRegion:          os.Getenv("AWS_REGION"),
+		SQSQueueURL:        os.Getenv("SQS_QUEUE_URL"),
+		AWSAccessKeyID:     os.Getenv("AWS_ACCESS_KEY_ID"),
+		AWSSecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
 	}
+	stripe.Key = config.StripePrivateKey
 	return config
 }

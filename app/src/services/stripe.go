@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/ArmandoBarragan/arlequines_website/settings"
@@ -12,7 +13,8 @@ import (
 
 type StripeService interface {
 	CreateCheckoutSession(webhook StripeWebhook) (*stripe.CheckoutSession, error)
-	ProcessPaymentSuccess(presentationID uint, sessionID string) error
+	ProcessPaymentSuccessRedis(presentationID uint, sessionID string) error
+	ProcessPaymentSuccessSQS(presentationID uint, sessionID string) error
 }
 
 type stripeService struct {
@@ -67,7 +69,7 @@ func (service stripeService) createCheckoutSession(presentation *models.Presenta
 	return session.New(params)
 }
 
-func (service stripeService) ProcessPaymentSuccess(presentationID uint, sessionID string) error {
+func (service stripeService) ProcessPaymentSuccessRedis(presentationID uint, sessionID string) error {
 	/* Decreases the available seats in the database, creates a QR and retrieves it
 	trough HTTP, but also creates an email sending event that sends the same QR to the
 	user's email*/
@@ -86,6 +88,30 @@ func (service stripeService) ProcessPaymentSuccess(presentationID uint, sessionI
 		Quantity:       quantity,
 		PresentationID: presentationID,
 	}
-	paymentEvent.CreateEmailSendingEvent()
+	paymentEvent.CreateEmailSendingEventRedis()
+	return nil
+}
+
+func (service stripeService) ProcessPaymentSuccessSQS(presentationID uint, sessionID string) error {
+	sessionData, err := session.Get(sessionID, nil)
+	if err != nil {
+		return err
+	}
+	presentation, err := service.repository.FindByID(presentationID)
+	if err != nil {
+		return err
+	}
+	quantity := int64(float64(sessionData.AmountTotal) / presentation.Price)
+	paymentEvent := PaymentEvent{
+		Email:          sessionData.CustomerEmail,
+		Amount:         sessionData.AmountTotal,
+		Quantity:       quantity,
+		PresentationID: presentationID,
+	}
+	err = paymentEvent.CreateEmailSendingEventSQS()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Successfully sent payment event to SQS for presentation %d", presentationID)
 	return nil
 }

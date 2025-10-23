@@ -16,6 +16,6 @@ func SetupStripeRoutes(app *fiber.App, db *gorm.DB, secretKey string) {
 
 	// Initialize handlers
 	app.Post("/stripe/webhook", handler.StripeWebhook)
-	app.Post("/stripe/success", handler.Success)
+	app.Get("/stripe/success", handler.Success)
 	app.Get("/stripe/cancel", handlers.Cancel)
 }
