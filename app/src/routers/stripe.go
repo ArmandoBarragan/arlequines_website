@@ -10,8 +10,9 @@ import (
 
 func SetupStripeRoutes(app *fiber.App, db *gorm.DB, secretKey string) {
 	// Initialize repositories and services as needed
-	repository := repositories.NewPresentationRepository(db)
-	service := services.NewStripeService(repository)
+	presentationRepository := repositories.NewPresentationRepository(db)
+	playRepository := repositories.NewPlayRepository(db)
+	service := services.NewStripeService(presentationRepository, playRepository)
 	handler := handlers.NewStripeHandler(service)
 
 	// Initialize handlers

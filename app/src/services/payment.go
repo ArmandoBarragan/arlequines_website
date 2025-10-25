@@ -21,7 +21,7 @@ type PaymentEvent struct {
 	Email          string `redis:"email" json:"email"`
 	Amount         int64  `redis:"amount" json:"amount"`
 	Quantity       int64  `redis:"quantity" json:"quantity"`
-	PresentationID uint   `redis:"presentation_id" json:"presentation_id"`
+	PresentationName string   `redis:"presentation_name" json:"presentation_name"`
 }
 
 func (p *PaymentEvent) CreateEmailSendingEventRedis() {
@@ -31,7 +31,7 @@ func (p *PaymentEvent) CreateEmailSendingEventRedis() {
 			"email":           p.Email,
 			"amount":          p.Amount,
 			"quantity":        p.Quantity,
-			"presentation_id": p.PresentationID,
+			"presentation_name": p.PresentationName,
 		},
 	})
 }
@@ -69,18 +69,18 @@ func (p *PaymentEvent) CreateEmailSendingEventSQS() error {
 				DataType:    aws.String("String"),
 				StringValue: aws.String("PaymentSuccess"),
 			},
-			"PresentationID": {
+			"PresentationName": {
 				DataType:    aws.String("Number"),
-				StringValue: aws.String(fmt.Sprintf("%d", p.PresentationID)),
+				StringValue: aws.String(p.PresentationName),
 			},
 		},
 		MessageGroupId: aws.String("payment_group"),
-		MessageDeduplicationId: aws.String(fmt.Sprintf("%s-%s%d", p.PresentationID, p.Email, rand.Intn(100))),
+		MessageDeduplicationId: aws.String(fmt.Sprintf("%s-%s%d", p.PresentationName, p.Email, rand.Intn(100))),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to send message to SQS: %w", err)
 	}
 
-	fmt.Printf("Successfully sent payment event to SQS for presentation %d", p.PresentationID)
+	fmt.Printf("Successfully sent payment event to SQS for presentation %s", p.PresentationName)
 	return nil
 }

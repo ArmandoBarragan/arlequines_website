@@ -18,11 +18,18 @@ type StripeService interface {
 }
 
 type stripeService struct {
-	repository repositories.PresentationRepository
+	presentationRepository repositories.PresentationRepository
+	playRepository repositories.PlayRepository
 }
 
-func NewStripeService(repository repositories.PresentationRepository) stripeService {
-	return stripeService{repository: repository}
+func NewStripeService(
+	presentationRepository repositories.PresentationRepository,
+	playRepository repositories.PlayRepository,
+) stripeService {
+	return stripeService{
+		presentationRepository: presentationRepository,
+		playRepository:         playRepository,
+	}
 }
 
 type StripeWebhook struct {
@@ -32,7 +39,7 @@ type StripeWebhook struct {
 }
 
 func (service stripeService) CreateCheckoutSession(webhook StripeWebhook) (*stripe.CheckoutSession, error) {
-	presentation, err := service.repository.FindByID(uint(webhook.PresentationID))
+	presentation, err := service.presentationRepository.FindByID(uint(webhook.PresentationID))
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +80,11 @@ func (service stripeService) ProcessPaymentSuccessRedis(presentationID uint, ses
 	/* Decreases the available seats in the database, creates a QR and retrieves it
 	trough HTTP, but also creates an email sending event that sends the same QR to the
 	user's email*/
-	presentation, err := service.repository.FindByID(presentationID)
+	presentation, err := service.presentationRepository.FindByID(presentationID)
+	if err != nil {
+		return err
+	}
+	play, err := service.playRepository.FindByID(presentation.PlayID)
 	if err != nil {
 		return err
 	}
@@ -86,7 +97,7 @@ func (service stripeService) ProcessPaymentSuccessRedis(presentationID uint, ses
 		Email:          sessionData.CustomerEmail,
 		Amount:         sessionData.AmountTotal,
 		Quantity:       quantity,
-		PresentationID: presentationID,
+		PresentationName: play.Name,
 	}
 	paymentEvent.CreateEmailSendingEventRedis()
 	return nil
@@ -97,7 +108,11 @@ func (service stripeService) ProcessPaymentSuccessSQS(presentationID uint, sessi
 	if err != nil {
 		return err
 	}
-	presentation, err := service.repository.FindByID(presentationID)
+	presentation, err := service.presentationRepository.FindByID(presentationID)
+	if err != nil {
+		return err
+	}
+	play, err := service.playRepository.FindByID(presentation.PlayID)
 	if err != nil {
 		return err
 	}
@@ -106,7 +121,7 @@ func (service stripeService) ProcessPaymentSuccessSQS(presentationID uint, sessi
 		Email:          sessionData.CustomerEmail,
 		Amount:         sessionData.AmountTotal,
 		Quantity:       quantity,
-		PresentationID: presentationID,
+		PresentationName: play.Name,
 	}
 	err = paymentEvent.CreateEmailSendingEventSQS()
 	if err != nil {

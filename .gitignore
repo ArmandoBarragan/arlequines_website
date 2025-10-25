@@ -25,5 +25,21 @@
 go.work
 
 # End of https://www.toptal.com/developers/gitignore/api/go
-.env
+*.env
 docker-compose.override.yml
+**/.aws.json
+
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+terraform.tfplan
+terraform.tfplan.json
+*.zip
+lambda/bootstrap
+
+# SAM (kept for local testing only, not used for deployment)
+lambda/.aws-sam/

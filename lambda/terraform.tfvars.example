@@ -1,0 +1,16 @@
+# Copy this file to terraform.tfvars and fill in your values
+# terraform.tfvars is gitignored and should not be committed
+
+aws_region = "us-east-1"
+environment = "dev"
+
+lambda_deployment_bucket_name = "arlequines-lambda-deployments"
+
+smtp_host  = "smtp.gmail.com"
+smtp_port  = "587"
+smtp_user  = "armandobp765@gmail.com"
+smtp_pass  = "your-smtp-password-here"  # Set this securely, never commit
+from_email = "armandobp765@gmail.com"
+
+sqs_queue_arn = "arn:aws:sqs:us-east-1:962469996968:Arlequines.fifo"
+

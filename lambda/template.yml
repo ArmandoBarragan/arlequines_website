@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Payment Email Sender Lambda Function
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 128
+    Runtime: provided.al2023
+    Environment:
+      Variables:
+        SMTPHost: !Ref SMTPHost
+        SMTPPort: !Ref SMTPPort
+        SMTPUser: !Ref SMTPUser
+        SMTPPass: !Ref SMTPPass
+        FromEmail: !Ref FromEmail
+
+Parameters:
+  SMTPHost:
+    Type: String
+    Description: SMTP server host
+    Default: smtp.gmail.com
+
+  SMTPPort:
+    Type: String
+    Description: SMTP server port
+    Default: "587"
+
+  SMTPUser:
+    Type: String
+    Description: SMTP username
+    Default: armandobp765@gmail.com
+
+  SMTPPass:
+    Type: String
+    Description: SMTP password
+    NoEcho: true
+
+  FromEmail:
+    Type: String
+    Description: From email address
+    Default: armandobp765@gmail.com
+
+  SQSQueueARN:
+    Type: String
+    Description: SQS queue ARN
+    Default: arn:aws:sqs:us-east-1:962469996968:Arlequines.fifo
+
+  SQSQueueURL:
+    Type: String
+    Description: SQS queue URL
+    Default: https://sqs.us-east-1.amazonaws.com/962469996968/Arlequines.fifo
+
+Resources:
+  PaymentEmailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: payment-email-sender
+      CodeUri: ./
+      Handler: main
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !Ref SQSQueueARN
+            BatchSize: 10
+
+  PaymentEmailBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: payment-email-bucket
+      AccessControl: Private
+      VersioningConfiguration:
+        Status: Suspended
+
+Outputs:
+  PaymentEmailFunctionArn:
+    Description: ARN of the Payment Email Lambda Function
+    Value: !GetAtt PaymentEmailFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-PaymentEmailFunctionArn"
+  PaymentEmailBucketName:
+    Description: Name of the Payment Email Bucket
+    Value: !Ref PaymentEmailBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-PaymentEmailBucketName"
