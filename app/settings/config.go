@@ -1,13 +1,11 @@
 package settings
 
 import (
-	"context"
 	"log"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/stripe/stripe-go/v82"
 )
 
@@ -22,8 +20,6 @@ type Config struct {
 	HostURL                     string
 	StripePublicKey             string
 	StripePrivateKey            string
-	RedisPassword               string
-	RedisConsumerConfigurations map[string]string
 	SMTPHost                    string
 	SMTPPort                    string
 	SMTPUser                    string
@@ -33,34 +29,6 @@ type Config struct {
 	SQSQueueURL        string
 	AWSAccessKeyID     string
 	AWSSecretAccessKey string
-}
-
-func InitRedis(config *Config) *redis.Client {
-	stripe.Key = config.StripePrivateKey
-	client := redis.NewClient(&redis.Options{
-		Addr:     "redis:6379",
-		Password: config.RedisPassword,
-		DB:       0,
-	})
-	ctx := context.Background()
-	_, err := client.Ping(ctx).Result()
-	if err != nil {
-		log.Fatalf("Could not connect to Redis: %v", err)
-	}
-	return client
-}
-
-func InitRedisConsumerGroup(redisClient *redis.Client, config *Config) {
-	ctx := context.Background()
-	err := redisClient.XGroupCreateMkStream(
-		ctx,
-		config.RedisConsumerConfigurations["payment_stream_name"],
-		config.RedisConsumerConfigurations["payment_consumer_group_name"],
-		config.RedisConsumerConfigurations["payment_consumer_group_id"],
-	).Err()
-	if err != nil && err.Error() != "BUSYGROUP Consumer Group name already exists" {
-		log.Fatalf("Could not create consumer group: %v", err)
-	}
 }
 
 func LoadConfig() *Config {
@@ -80,13 +48,6 @@ func LoadConfig() *Config {
 		HostURL:          os.Getenv("HOST_URL"),
 		StripePublicKey:  os.Getenv("STRIPE_PUBLIC_KEY"),
 		StripePrivateKey: os.Getenv("STRIPE_PRIVATE_KEY"),
-		RedisPassword:    os.Getenv("REDIS_PASSWORD"),
-		RedisConsumerConfigurations: map[string]string{
-			"payment_stream_name":         "payment_stream",
-			"payment_consumer_prefix":     "payment_consumer_",
-			"payment_consumer_group_name": "payment_consumer_group",
-			"payment_consumer_group_id":   "0",
-		},
 		SMTPHost:      os.Getenv("SMTP_HOST"),
 		SMTPPort:      os.Getenv("SMTP_PORT"),
 		SMTPUser:      os.Getenv("SMTP_USER"),

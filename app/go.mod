@@ -5,7 +5,6 @@ go 1.23
 require (
 	github.com/gofiber/fiber/v2 v2.52.8
 	github.com/golang-jwt/jwt/v5 v5.2.2
-	github.com/redis/go-redis/v9 v9.10.0
 	github.com/stripe/stripe-go/v82 v82.2.1
 	golang.org/x/crypto v0.31.0
 	gorm.io/driver/postgres v1.6.0

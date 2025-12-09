@@ -8,15 +8,16 @@ import (
 	"gorm.io/gorm"
 )
 
-func SetupStripeRoutes(app *fiber.App, db *gorm.DB, secretKey string) {
+func SetupPaymentRoutes(app *fiber.App, db *gorm.DB, secretKey string) {
 	// Initialize repositories and services as needed
 	presentationRepository := repositories.NewPresentationRepository(db)
 	playRepository := repositories.NewPlayRepository(db)
-	service := services.NewStripeService(presentationRepository, playRepository)
-	handler := handlers.NewStripeHandler(service)
+	paymentRepository := repositories.NewPaymentRepository(db)
+	service := services.NewPaymentService(presentationRepository, playRepository, paymentRepository)
+	handler := handlers.NewPaymentHandler(service)
 
 	// Initialize handlers
-	app.Post("/stripe/webhook", handler.StripeWebhook)
-	app.Get("/stripe/success", handler.Success)
-	app.Get("/stripe/cancel", handlers.Cancel)
+	app.Post("/payment/webhook", handler.StripeWebhook)
+	app.Get("/payment/success", handler.Success)
+	app.Get("/payment/cancel", handler.Cancel)
 }

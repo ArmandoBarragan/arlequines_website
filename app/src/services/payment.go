@@ -4,41 +4,52 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"strconv"
+
 	"github.com/ArmandoBarragan/arlequines_website/settings"
+	"github.com/ArmandoBarragan/arlequines_website/src/models"
+	"github.com/ArmandoBarragan/arlequines_website/src/repositories"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
-	"github.com/redis/go-redis/v9"
+	"github.com/stripe/stripe-go/v82"
+	"github.com/stripe/stripe-go/v82/checkout/session"
 )
 
-var RedisClient *redis.Client
 var Config *settings.Config
 
-type PaymentEvent struct {
-	Email          string `redis:"email" json:"email"`
-	Amount         int64  `redis:"amount" json:"amount"`
-	Quantity       int64  `redis:"quantity" json:"quantity"`
-	PresentationName string   `redis:"presentation_name" json:"presentation_name"`
+type PaymentService interface {
+	CreateCheckoutSession(webhook StripeWebhook) (*stripe.CheckoutSession, error)
+	CreatePayment(payment *models.Payment) error
+	CreateEmailSendingEventToSQS(payment *models.Payment) error
 }
 
-func (p *PaymentEvent) CreateEmailSendingEventRedis() {
-	RedisClient.XAdd(context.Background(), &redis.XAddArgs{
-		Stream: Config.RedisConsumerConfigurations["payment_stream_name"],
-		Values: map[string]any{
-			"email":           p.Email,
-			"amount":          p.Amount,
-			"quantity":        p.Quantity,
-			"presentation_name": p.PresentationName,
-		},
-	})
+type paymentService struct {
+	presentationRepository repositories.PresentationRepository
+	playRepository repositories.PlayRepository
+	paymentRepository repositories.PaymentRepository
 }
 
-// New method to send to SQS
-func (p *PaymentEvent) CreateEmailSendingEventSQS() error {
-	// Create AWS config
+func NewPaymentService(
+	presentationRepository repositories.PresentationRepository,
+	playRepository repositories.PlayRepository,
+	paymentRepository repositories.PaymentRepository,
+) PaymentService {
+	return &paymentService{
+		presentationRepository: presentationRepository,
+		playRepository: playRepository,
+		paymentRepository: paymentRepository,
+	}
+}
+
+
+func (service paymentService) CreatePayment(payment *models.Payment) error {
+	return service.paymentRepository.Create(payment)
+}
+
+func (service paymentService) CreateEmailSendingEventToSQS(payment *models.Payment) error {
 	localConfig := settings.LoadConfig()
 	awsConfig, err := config.LoadDefaultConfig(context.TODO(),
 		config.WithRegion(localConfig.AWSRegion),
@@ -55,7 +66,7 @@ func (p *PaymentEvent) CreateEmailSendingEventSQS() error {
 	// Create SQS client
 	sqsClient := sqs.NewFromConfig(awsConfig)
 	// Convert PaymentEvent to JSON
-	messageBody, err := json.Marshal(p)
+	messageBody, err := json.Marshal(payment)
 	if err != nil {
 		return fmt.Errorf("failed to marshal payment event: %w", err)
 	}
@@ -71,16 +82,61 @@ func (p *PaymentEvent) CreateEmailSendingEventSQS() error {
 			},
 			"PresentationName": {
 				DataType:    aws.String("Number"),
-				StringValue: aws.String(p.PresentationName),
+				StringValue: aws.String(payment.PresentationName),
 			},
 		},
 		MessageGroupId: aws.String("payment_group"),
-		MessageDeduplicationId: aws.String(fmt.Sprintf("%s-%s%d", p.PresentationName, p.Email, rand.Intn(100))),
+		MessageDeduplicationId: aws.String(fmt.Sprintf("%d", payment.ID)),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to send message to SQS: %w", err)
 	}
 
-	fmt.Printf("Successfully sent payment event to SQS for presentation %s", p.PresentationName)
+	fmt.Printf("Successfully sent payment event to SQS for presentation %s", payment.PresentationName)
 	return nil
 }
+
+type StripeWebhook struct {
+	AmountOfTickets int    `json:"amount_of_tickets"`
+	PresentationID  uint   `json:"presentation_id"`
+	Email           string `json:"email"`
+}
+
+func (service paymentService) CreateCheckoutSession(webhook StripeWebhook) (*stripe.CheckoutSession, error) {
+	presentation, err := service.presentationRepository.FindByID(uint(webhook.PresentationID))
+	if err != nil {
+		return nil, err
+	}
+	checkoutSession, err := service.createCheckoutSession(presentation, webhook)
+	if err != nil {
+		return nil, err
+	}
+	return checkoutSession, nil
+}
+
+func (service paymentService) createCheckoutSession(presentation *models.Presentation, webhook StripeWebhook) (*stripe.CheckoutSession, error) {
+	config := settings.LoadConfig()
+	successURL := "/stripe/success?session_id={CHECKOUT_SESSION_ID}&presentation_id="
+	params := &stripe.CheckoutSessionParams{
+		LineItems: []*stripe.CheckoutSessionLineItemParams{
+			{
+				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
+					Currency: stripe.String(string(stripe.CurrencyMXN)),
+					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
+						Name: stripe.String("Ticket"), // Product name
+					},
+					UnitAmount: stripe.Int64(int64(presentation.Price * 100)), // Price in cents (2000 cents = $20.00)
+				},
+				Quantity: stripe.Int64(int64(webhook.AmountOfTickets)), // Quantity of the item
+			},
+		},
+		Mode: stripe.String(string(stripe.CheckoutSessionModePayment)), // Set mode to 'payment' for one-time payments
+		SuccessURL: stripe.String(
+			config.HostURL + successURL + strconv.Itoa(int(presentation.ID)),
+		),
+		CancelURL:     stripe.String(config.HostURL + "/stripe/cancel"),
+		CustomerEmail: stripe.String(webhook.Email),
+	}
+	return session.New(params)
+}
+

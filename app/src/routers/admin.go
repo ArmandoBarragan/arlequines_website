@@ -13,17 +13,23 @@ func SetupAdminRoutes(app *fiber.App, db *gorm.DB, secretKey string) {
 	userRepository := repositories.NewUserRepository(db, secretKey)
 	playRepository := repositories.NewPlayRepository(db)
 	presentationRepository := repositories.NewPresentationRepository(db)
+	paymentRepository := repositories.NewPaymentRepository(db)
 
 	// Initialize services
 	authService := services.NewAuthService(userRepository, secretKey)
 	playService := services.NewPlayService(playRepository)
 	presentationService := services.NewPresentationService(presentationRepository)
+	paymentService := services.NewPaymentService(
+		presentationRepository,
+		playRepository,
+		paymentRepository,
+	)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	playHandler := handlers.CreatePlayHandler(playService)
 	presentationHandler := handlers.CreatePresentationHandler(presentationService)
-
+	paymentHandler := handlers.NewPaymentHandler(paymentService)
 	admin := app.Group("/admin")
 	admin.Use(authHandler.Protected())
 	admin.Use(authHandler.AdminOnly())
@@ -46,4 +52,10 @@ func SetupAdminRoutes(app *fiber.App, db *gorm.DB, secretKey string) {
 	presentations.Post("/", presentationHandler.Create)
 	presentations.Put("/:id", presentationHandler.Update)
 	presentations.Delete("/:id", presentationHandler.Delete)
+
+	// Payment management routes
+	payments := admin.Group("/payments")
+	payments.Post("/", paymentHandler.StripeWebhook)
+	payments.Get("/success", paymentHandler.Success)
+	payments.Get("/cancel", paymentHandler.Cancel)
 }

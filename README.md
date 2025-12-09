@@ -18,7 +18,6 @@ A theater booking platform built with Go, featuring play and presentation manage
 - **Database**: PostgreSQL 15 with [GORM](https://gorm.io/)
 - **Authentication**: JWT tokens (golang-jwt/jwt/v5)
 - **Payment**: [Stripe](https://stripe.com/) integration
-- **Caching**: Redis (optional, currently commented out)
 - **Cloud**: AWS Lambda for email processing, SQS for message queuing
 - **Infrastructure**: Terraform for Lambda deployment
 - **Containerization**: Docker & Docker Compose
@@ -75,9 +74,6 @@ AWS_REGION=us-east-1
 SQS_QUEUE_URL=your_sqs_queue_url
 AWS_ACCESS_KEY_ID=your_access_key
 AWS_SECRET_ACCESS_KEY=your_secret_key
-
-# Redis (optional)
-REDIS_PASSWORD=your_redis_password
 ```
 
 ### 3. Run with Docker Compose
@@ -210,8 +206,5 @@ For the email service, configure:
 [Add your license here]
 
 ## Notes
-
-- Redis is currently commented out in `docker-compose.yml` but can be enabled if needed
-- The application includes a TODO for creating a thread to delete successful Redis tasks daily at 12:00 AM
 - The Lambda function requires SMTP configuration (host, port, user, password) for sending emails
 

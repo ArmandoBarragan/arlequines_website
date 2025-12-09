@@ -18,11 +18,10 @@ func main() {
 
 	db.AutoMigrate(&models.Play{}, &models.Presentation{}, &models.User{})
 
-	// TODO: Create a thread that deletes successful redis tasks every day at 12:00 AM
 	app := fiber.New()
 
 	routers.SetupPublicRoutes(app, db, config.SecretKey)
-	routers.SetupStripeRoutes(app, db, config.SecretKey)
+	routers.SetupPaymentRoutes(app, db, config.SecretKey)
 	routers.SetupAuthRoutes(app, db, config.SecretKey)
 	routers.SetupAdminRoutes(app, db, config.SecretKey)
 	app.Listen(":8000")
