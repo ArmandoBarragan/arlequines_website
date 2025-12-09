@@ -29,7 +29,7 @@ func SetupAdminRoutes(app *fiber.App, db *gorm.DB, secretKey string) {
 	authHandler := handlers.NewAuthHandler(authService)
 	playHandler := handlers.CreatePlayHandler(playService)
 	presentationHandler := handlers.CreatePresentationHandler(presentationService)
-	paymentHandler := handlers.NewPaymentHandler(paymentService)
+	paymentHandler := handlers.CreatePaymentHandler(paymentService, presentationService)
 	admin := app.Group("/admin")
 	admin.Use(authHandler.Protected())
 	admin.Use(authHandler.AdminOnly())

@@ -28,8 +28,8 @@ type PaymentService interface {
 
 type paymentService struct {
 	presentationRepository repositories.PresentationRepository
-	playRepository repositories.PlayRepository
-	paymentRepository repositories.PaymentRepository
+	playRepository         repositories.PlayRepository
+	paymentRepository      repositories.PaymentRepository
 }
 
 func NewPaymentService(
@@ -39,11 +39,10 @@ func NewPaymentService(
 ) PaymentService {
 	return &paymentService{
 		presentationRepository: presentationRepository,
-		playRepository: playRepository,
-		paymentRepository: paymentRepository,
+		playRepository:         playRepository,
+		paymentRepository:      paymentRepository,
 	}
 }
-
 
 func (service paymentService) CreatePayment(payment *models.Payment) error {
 	return service.paymentRepository.Create(payment)
@@ -85,7 +84,7 @@ func (service paymentService) CreateEmailSendingEventToSQS(payment *models.Payme
 				StringValue: aws.String(payment.PresentationName),
 			},
 		},
-		MessageGroupId: aws.String("payment_group"),
+		MessageGroupId:         aws.String("payment_group"),
 		MessageDeduplicationId: aws.String(fmt.Sprintf("%d", payment.ID)),
 	})
 	if err != nil {
@@ -116,7 +115,7 @@ func (service paymentService) CreateCheckoutSession(webhook StripeWebhook) (*str
 
 func (service paymentService) createCheckoutSession(presentation *models.Presentation, webhook StripeWebhook) (*stripe.CheckoutSession, error) {
 	config := settings.LoadConfig()
-	successURL := "/stripe/success?session_id={CHECKOUT_SESSION_ID}&presentation_id="
+	successURL := "/payment/success?session_id={CHECKOUT_SESSION_ID}&presentation_id=" + strconv.Itoa(int(presentation.ID))
 	params := &stripe.CheckoutSessionParams{
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
@@ -130,13 +129,10 @@ func (service paymentService) createCheckoutSession(presentation *models.Present
 				Quantity: stripe.Int64(int64(webhook.AmountOfTickets)), // Quantity of the item
 			},
 		},
-		Mode: stripe.String(string(stripe.CheckoutSessionModePayment)), // Set mode to 'payment' for one-time payments
-		SuccessURL: stripe.String(
-			config.HostURL + successURL + strconv.Itoa(int(presentation.ID)),
-		),
+		Mode:          stripe.String(string(stripe.CheckoutSessionModePayment)), // Set mode to 'payment' for one-time payments
+		SuccessURL:    stripe.String(config.HostURL + successURL),
 		CancelURL:     stripe.String(config.HostURL + "/stripe/cancel"),
 		CustomerEmail: stripe.String(webhook.Email),
 	}
 	return session.New(params)
 }
-

@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"math"
 	"strconv"
 
 	"github.com/ArmandoBarragan/arlequines_website/src/models"
 	"github.com/ArmandoBarragan/arlequines_website/src/services"
 	"github.com/gofiber/fiber/v2"
+	"github.com/stripe/stripe-go/v82/checkout/session"
+	"github.com/stripe/stripe-go/v82/paymentintent"
 )
 
 type PaymentHandler interface {
@@ -15,11 +18,18 @@ type PaymentHandler interface {
 }
 
 type paymentHandler struct {
-	paymentService services.PaymentService
+	paymentService      services.PaymentService
+	presentationService services.PresentationService
 }
 
-func NewPaymentHandler(paymentService services.PaymentService) paymentHandler {
-	return paymentHandler{paymentService: paymentService}
+func CreatePaymentHandler(
+	paymentService services.PaymentService,
+	presentationService services.PresentationService,
+) paymentHandler {
+	return paymentHandler{
+		paymentService:      paymentService,
+		presentationService: presentationService,
+	}
 }
 
 func (handler paymentHandler) StripeWebhook(c *fiber.Ctx) error {
@@ -44,28 +54,42 @@ func (handler paymentHandler) StripeWebhook(c *fiber.Ctx) error {
 }
 
 func (handler *paymentHandler) Success(c *fiber.Ctx) error {
+	/* Fetch the information from the payment and store it in the database, as well as the
+	reservation, then generate the SQS message that is sent to the lambda */
 	sessionID := c.Query("session_id")
 	if sessionID == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "Session ID was invalid"})
 	}
+	stripeSession, err := session.Get(sessionID, nil)
+	if err != nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Error getting stripe session"})
+	}
+	paymentIntent, err := paymentintent.Get(stripeSession.PaymentIntent.ID, nil)
+	if err != nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Error getting the payment intent"})
+	}
 	presentationID, err := strconv.Atoi(c.Query("presentation_id"))
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Error getting presentation"})
+		return c.Status(503).JSON(fiber.Map{"error": "Error getting presentation"})
 	}
-	amount, err := strconv.Atoi(c.Query("amount"))
+	paidAmount := float64(paymentIntent.Amount) / 100.0
+	presentation, err := handler.presentationService.GetPresentation(uint(presentationID))
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Error getting amount"})
+		return c.Status(503).JSON(fiber.Map{"error": err.Error()})
 	}
-	quantity, err := strconv.Atoi(c.Query("quantity"))
-	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Error getting quantity"})
+	// Validate that it's actually a round number. Can't have reservations for 2.4 people
+	var quantity float64 = paidAmount / presentation.Price
+	if quantity != math.Trunc(quantity) {
+		return c.Status(503).JSON(
+			fiber.Map{"error": "Somehow the quantity is not a whole number. Please contact tech support"},
+		)
 	}
 	payment := &models.Payment{
-		SessionID: sessionID,
+		SessionID:      sessionID,
 		PresentationID: uint(presentationID),
-		Email: c.Query("email"),
-		Amount: float64(amount) / 100.0,
-		Quantity: quantity,
+		Email:          c.Query("email"),
+		Amount:         paidAmount,
+		Quantity:       int(quantity),
 	}
 	if err := handler.paymentService.CreateEmailSendingEventToSQS(payment); err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})

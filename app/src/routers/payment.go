@@ -13,8 +13,9 @@ func SetupPaymentRoutes(app *fiber.App, db *gorm.DB, secretKey string) {
 	presentationRepository := repositories.NewPresentationRepository(db)
 	playRepository := repositories.NewPlayRepository(db)
 	paymentRepository := repositories.NewPaymentRepository(db)
-	service := services.NewPaymentService(presentationRepository, playRepository, paymentRepository)
-	handler := handlers.NewPaymentHandler(service)
+	paymentService := services.NewPaymentService(presentationRepository, playRepository, paymentRepository)
+	presentationService := services.NewPresentationService(presentationRepository)
+	handler := handlers.CreatePaymentHandler(paymentService, presentationService)
 
 	// Initialize handlers
 	app.Post("/payment/webhook", handler.StripeWebhook)
