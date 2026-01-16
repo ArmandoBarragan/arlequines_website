@@ -79,9 +79,9 @@ func (service paymentService) CreateEmailSendingEventToSQS(payment *models.Payme
 				DataType:    aws.String("String"),
 				StringValue: aws.String("PaymentSuccess"),
 			},
-			"PresentationName": {
+			"PresentationID": {
 				DataType:    aws.String("Number"),
-				StringValue: aws.String(payment.PresentationName),
+				StringValue: aws.String(strconv.FormatUint(uint64(payment.PresentationID), 10)),
 			},
 		},
 		MessageGroupId:         aws.String("payment_group"),
@@ -90,8 +90,6 @@ func (service paymentService) CreateEmailSendingEventToSQS(payment *models.Payme
 	if err != nil {
 		return fmt.Errorf("failed to send message to SQS: %w", err)
 	}
-
-	fmt.Printf("Successfully sent payment event to SQS for presentation %s", payment.PresentationName)
 	return nil
 }
 
@@ -113,7 +111,10 @@ func (service paymentService) CreateCheckoutSession(webhook StripeWebhook) (*str
 	return checkoutSession, nil
 }
 
-func (service paymentService) createCheckoutSession(presentation *models.Presentation, webhook StripeWebhook) (*stripe.CheckoutSession, error) {
+func (service paymentService) createCheckoutSession(
+	presentation *models.Presentation,
+	webhook StripeWebhook,
+) (*stripe.CheckoutSession, error) {
 	config := settings.LoadConfig()
 	successURL := "/payment/success?session_id={CHECKOUT_SESSION_ID}&presentation_id=" + strconv.Itoa(int(presentation.ID))
 	params := &stripe.CheckoutSessionParams{

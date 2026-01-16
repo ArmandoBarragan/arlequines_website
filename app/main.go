@@ -16,7 +16,12 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	db.AutoMigrate(&models.Play{}, &models.Presentation{}, &models.User{})
+	db.AutoMigrate(
+		&models.Play{},
+		&models.Presentation{},
+		&models.User{},
+		&models.Payment{},
+	)
 
 	app := fiber.New()
 

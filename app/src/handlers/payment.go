@@ -87,7 +87,7 @@ func (handler *paymentHandler) Success(c *fiber.Ctx) error {
 	payment := &models.Payment{
 		SessionID:      sessionID,
 		PresentationID: uint(presentationID),
-		Email:          c.Query("email"),
+		Email:          stripeSession.CustomerEmail,
 		Amount:         paidAmount,
 		Quantity:       int(quantity),
 	}
