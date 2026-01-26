@@ -22,10 +22,10 @@ type PaymentEvent struct {
 
 // EmailConfig holds SMTP configuration
 type EmailConfig struct {
-	SMTPHost string
-	SMTPPort string
-	SMTPUser string
-	SMTPPass string
+	SMTPHost  string
+	SMTPPort  string
+	SMTPUser  string
+	SMTPPass  string
 	FromEmail string
 }
 
@@ -69,7 +69,7 @@ func sendConfirmationEmail(event PaymentEvent, config EmailConfig) error {
 	amount := float64(event.Amount) / 100.0
 	fmt.Println(amount)
 	subject := fmt.Sprintf("Confirmación de Compra - Presentación %d", event.PresentationID)
-	body := fmt.Sprintf("Hola!")
+	body := "Hola!"
 	message := fmt.Sprintf(
 		"To: %s\r\nSubject: %s\r\n\r\n%s",
 		event.Email,
@@ -77,14 +77,6 @@ func sendConfirmationEmail(event PaymentEvent, config EmailConfig) error {
 		body,
 	)
 
-	fmt.Println(
-		"user: ", config.SMTPUser,
-		"pass: ", config.SMTPPass,
-		"host: ", config.SMTPHost,
-		"port: ", config.SMTPPort,
-		"from: ", config.FromEmail,
-		"to: ", event.Email,
-	)
 	auth := smtp.PlainAuth("", config.SMTPUser, config.SMTPPass, config.SMTPHost)
 	addr := fmt.Sprintf("%s:%s", config.SMTPHost, config.SMTPPort)
 	err := smtp.SendMail(addr, auth, config.FromEmail, []string{event.Email}, []byte(message))
